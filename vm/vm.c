@@ -9,11 +9,13 @@
 
 #define ADD     0x30
 #define SUB     0x31
+#define ADD_I   0x32
 
 #define JMZ     0x40
 #define JMP     0x41
 #define JSR     0x42
 #define RET     0x43
+#define JMN     0x44
 
 #define FETCH (heap[state->pc++])
 #define STORE(v, addr) heap[addr] = v
@@ -27,6 +29,10 @@
 
 #define u8 unsigned char
 #define u32 unsigned int
+
+#define FLAG_CARRY 1
+#define FLAG_ZERO  2
+#define FLAG_NEG   4
 
 typedef struct {
   u32 pc;
@@ -58,11 +64,16 @@ void init() {
   state->pc = 0;
 }
 
+inline void set_flags(state_t *state) {
+}
+
 EXPORT
 void steps(u32 n) {
   GET_STATE;
   GET_HEAP;
   for (u32 i = 0; i < n; i++) {
+	 u8 set_carry = state->flags & FLAG_CARRY;
+
 	 switch (FETCH) {
 	 case LDA_Z: state->acc = heap[FETCH]; break;
 	 case LDA_I: state->acc = FETCH; break;
@@ -79,12 +90,60 @@ void steps(u32 n) {
 		STORE(state->acc, (addr_H << 8) + addr_L);
 		break;
 	 }
+	 case ADD: {
+		u8 addr_L = FETCH;
+		u8 addr_H = FETCH;
+		u32 sum = state->acc + heap[(addr_H << 8) + addr_L] + (state->flags & FLAG_CARRY);
+		state->acc = sum & 0xff;
+		set_carry = !!(sum & 0x100);
+		break;
+	 }
+	 case SUB: {
+		u8 addr_L = FETCH;
+		u8 addr_H = FETCH;
+		u32 sum = state->acc - heap[(addr_H << 8) + addr_L] - (state->flags & FLAG_CARRY);
+		state->acc = sum & 0xff; // XXX not sure this carry computation is right?
+		set_carry = !!(sum & 0x100);
+		break;
+	 }
+	 case ADD_I: {
+		u32 sum = state->acc + FETCH + (state->flags & FLAG_CARRY);
+		state->acc = sum & 0xff;
+		set_carry = !!(sum & 0x100);
+		break;
+	 }
+	 case JMZ: {
+		u8 addr_L = FETCH;
+		u8 addr_H = FETCH;
+		if (state->flags & FLAG_ZERO)
+		  state->pc = (addr_H << 8) + addr_L;
+		break;
+	 }
 	 case JMP: {
 		u8 addr_L = FETCH;
 		u8 addr_H = FETCH;
 		state->pc = (addr_H << 8) + addr_L;
+		break;
+	 }
+	 case JSR: {
+		break;
+	 }
+	 case RET: {
+		break;
+	 }
+	 case JMN: {
+		u8 addr_L = FETCH;
+		u8 addr_H = FETCH;
+		if (state->flags & FLAG_NEG)
+		  state->pc = (addr_H << 8) + addr_L;
+		break;
 	 }
 	 default: break;
 	 }
+
+	 state->flags =
+		(state->acc == 0 ? FLAG_ZERO : 0) |
+		(state->acc >= 128 ? FLAG_NEG : 0) |
+		(set_carry ? FLAG_CARRY : 0);
   }
 }

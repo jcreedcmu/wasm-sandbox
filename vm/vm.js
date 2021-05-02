@@ -17,10 +17,12 @@ function poke(addr, val) {
   mbuf[HEAP_START + addr] = val;
 }
 
-function dump() {
+function dump(start) {
+  if (start == undefined)
+	 start = 0;
   const slice = [];
   for (let i = 0; i < 16; i++) {
-	 slice.push(mbuf[1024 + i]);
+	 slice.push(mbuf[1024 + start + i]);
   }
   return {pc: pc(), slice};
 }
@@ -44,21 +46,31 @@ const STA     = 0x22;
 
 const ADD     = 0x30;
 const SUB     = 0x31;
+const ADD_I   = 0x32
 
 const JMZ     = 0x40;
 const JMP     = 0x41;
 const JSR     = 0x42;
 const RET     = 0x43;
+const JMN     = 0x44;
 
-
-const asm = [0x00, LDA_I, 0x98, STA, 0x00, 0x00, JMP, 0x03, 0x00]
+const asm = [
+  LDA_I, 0x91,
+  STA, 0x20, 0x00,
+  ADD, 0x20, 0x00,
+  STA, 0x20, 0x00,
+  LDA_I, 0x00,
+  ADD_I, 0x00,
+  STA, 0x21, 0x00,
+  JMP, 0x00, 0x00
+]
 
 asm.forEach((a, i) => {
   poke(i, a);
 });
 
 for (let i = 0; i < 20; i++) {
-  const d = dump();
+  const d = dump(0x20);
   console.log(`PC: ${d.pc} ZP: ${d.slice.map(hexify).join(" ")}`);
   vm.steps(1);
 
