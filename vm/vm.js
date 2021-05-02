@@ -2,15 +2,16 @@ const fs = require('fs');
 
 const compiled = new WebAssembly.Module(fs.readFileSync('vm.wasm'));
 const ins = new WebAssembly.Instance(compiled, {});
+const vm = ins.exports;
 
-const mem = ins.exports.memory;
+const mem = vm.memory;
 const mbuf = Buffer.from(mem.buffer);
 
-const HEAP_START = ins.exports.heap_start();
-const STACK_START = ins.exports.stack_start();
+const HEAP_START = vm.heap_start();
+const STACK_START = vm.stack_start();
 
 function pc() {
-  return mbuf[1] + (mbuf[2] << 8) + (mbuf[3] << 16) + (mbuf[4] << 24) - HEAP_START;
+  return mbuf[1] + (mbuf[2] << 8) + (mbuf[3] << 16) + (mbuf[4] << 24);
 }
 
 function poke(addr, val) {
@@ -25,18 +26,16 @@ function dump() {
   return {pc: pc(), slice};
 }
 
-
-console.log('HEAP_START', HEAP_START);
-console.log('STACK_START', STACK_START);
-ins.exports.init();
+vm.init();
 
 console.log(dump());
 
-poke(2, 0x41); // JMP
-poke(3, 0x01); // DST_L
-poke(4, 0x00); // DST_H
+poke(5, 0x41); // JMP
+poke(6, 0x01); // DST_L
+poke(7, 0x00); // DST_H
 
-console.time();
-ins.exports.steps(4);
-console.timeEnd();
-console.log(dump());
+for (let i = 0; i < 10; i++) {
+  console.log(pc());
+  vm.steps(1);
+
+}

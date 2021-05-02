@@ -15,7 +15,7 @@
 #define JSR     0x42
 #define RET     0x43
 
-#define FETCH (*((state->pc)++))
+#define FETCH (state->heap[state->pc++])
 
 #define STATE_START 1  // compiler doesn't like writes to address zero
 #define STACK_START 2048
@@ -27,7 +27,7 @@
 #define u32 unsigned int
 
 typedef struct {
-  u8 *pc;
+  u32 pc;
   u8 *heap;
   u8 *stack;
   u8 acc;
@@ -53,7 +53,7 @@ void init() {
   state->stack = (u8 *)STACK_START;
   state->flags = 0;
   state->acc = 0;
-  state->pc = state->heap;
+  state->pc = 0;
 }
 
 EXPORT
@@ -61,20 +61,18 @@ void steps(u32 n) {
   GET_STATE;
   for (u32 i = 0; i < n; i++) {
 	 switch (FETCH) {
-	 case LDA_Z: state->acc = *((u8 *)(int)(FETCH)); break;
+	 case LDA_Z: state->acc = state->heap[FETCH]; break;
 	 case LDA_I: state->acc = FETCH; break;
 	 case LDA: {
 		u8 addr_L = FETCH;
 		u8 addr_H = FETCH;
-		u8 *addr = (u8 *)((addr_H << 8) + addr_L + HEAP_START);
-		state->acc = *addr;
+		state->acc = state->heap[(addr_H << 8) + addr_L];
 		break;
 	 }
 	 case JMP: {
 		u8 addr_L = FETCH;
 		u8 addr_H = FETCH;
-		u8 *addr = (u8 *)((addr_H << 8) + addr_L + HEAP_START);
-		state->pc = addr;
+		state->pc = (addr_H << 8) + addr_L;
 	 }
 	 default: break;
 	 }
