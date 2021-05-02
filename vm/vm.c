@@ -18,8 +18,8 @@
 #define FETCH (*((state->pc)++))
 
 #define STATE_START 1  // compiler doesn't like writes to address zero
-#define STACK_START 1024
-#define HEAP_START 2048
+#define STACK_START 2048
+#define HEAP_START 1024
 
 #define GET_STATE state_t *state = (state_t *)STATE_START
 
@@ -35,6 +35,16 @@ typedef struct {
 } state_t;
 
 #define EXPORT __attribute__((visibility("default")))
+
+EXPORT
+int stack_start() {
+  return STACK_START;
+}
+
+EXPORT
+int heap_start() {
+  return HEAP_START;
+}
 
 EXPORT
 void init() {
@@ -56,9 +66,15 @@ void steps(u32 n) {
 	 case LDA: {
 		u8 addr_L = FETCH;
 		u8 addr_H = FETCH;
-		u8 *addr = (u8 *)((addr_H << 8) + addr_L);
+		u8 *addr = (u8 *)((addr_H << 8) + addr_L + HEAP_START);
 		state->acc = *addr;
 		break;
+	 }
+	 case JMP: {
+		u8 addr_L = FETCH;
+		u8 addr_H = FETCH;
+		u8 *addr = (u8 *)((addr_H << 8) + addr_L + HEAP_START);
+		state->pc = addr;
 	 }
 	 default: break;
 	 }
