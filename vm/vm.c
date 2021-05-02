@@ -15,21 +15,22 @@
 #define JSR     0x42
 #define RET     0x43
 
-#define FETCH (state->heap[state->pc++])
+#define FETCH (heap[state->pc++])
+#define STORE(v, addr) heap[addr] = v
 
 #define STATE_START 1  // compiler doesn't like writes to address zero
-#define STACK_START 2048
+#define STACK_START 1024 // *relative* to HEAP_START
 #define HEAP_START 1024
 
 #define GET_STATE state_t *state = (state_t *)STATE_START
+#define GET_HEAP u8 *heap = (u8 *)HEAP_START
 
 #define u8 unsigned char
 #define u32 unsigned int
 
 typedef struct {
   u32 pc;
-  u8 *heap;
-  u8 *stack;
+  u32 stack;
   u8 acc;
   u8 flags;
 } state_t;
@@ -37,20 +38,21 @@ typedef struct {
 #define EXPORT __attribute__((visibility("default")))
 
 EXPORT
-int stack_start() {
-  return STACK_START;
-}
-
-EXPORT
 int heap_start() {
   return HEAP_START;
 }
 
 EXPORT
+u32 pc() {
+  GET_STATE;
+  return state->pc;
+}
+
+
+EXPORT
 void init() {
   GET_STATE;
-  state->heap = (u8 *)HEAP_START;
-  state->stack = (u8 *)STACK_START;
+  state->stack = STACK_START;
   state->flags = 0;
   state->acc = 0;
   state->pc = 0;
@@ -59,14 +61,22 @@ void init() {
 EXPORT
 void steps(u32 n) {
   GET_STATE;
+  GET_HEAP;
   for (u32 i = 0; i < n; i++) {
 	 switch (FETCH) {
-	 case LDA_Z: state->acc = state->heap[FETCH]; break;
+	 case LDA_Z: state->acc = heap[FETCH]; break;
 	 case LDA_I: state->acc = FETCH; break;
 	 case LDA: {
 		u8 addr_L = FETCH;
 		u8 addr_H = FETCH;
-		state->acc = state->heap[(addr_H << 8) + addr_L];
+		state->acc = heap[(addr_H << 8) + addr_L];
+		break;
+	 }
+	 case STA_Z: STORE(state->acc, FETCH); break;
+	 case STA: {
+		u8 addr_L = FETCH;
+		u8 addr_H = FETCH;
+		STORE(state->acc, (addr_H << 8) + addr_L);
 		break;
 	 }
 	 case JMP: {

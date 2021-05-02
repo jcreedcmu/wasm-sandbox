@@ -8,10 +8,9 @@ const mem = vm.memory;
 const mbuf = Buffer.from(mem.buffer);
 
 const HEAP_START = vm.heap_start();
-const STACK_START = vm.stack_start();
 
 function pc() {
-  return mbuf[1] + (mbuf[2] << 8) + (mbuf[3] << 16) + (mbuf[4] << 24);
+  return vm.pc();
 }
 
 function poke(addr, val) {
@@ -20,22 +19,47 @@ function poke(addr, val) {
 
 function dump() {
   const slice = [];
-  for (let i = 0; i < 32; i++) {
+  for (let i = 0; i < 16; i++) {
 	 slice.push(mbuf[1024 + i]);
   }
   return {pc: pc(), slice};
+}
+
+function hexify(n) {
+  return '0x' + ("00" + n.toString(16)).substr(-2);
 }
 
 vm.init();
 
 console.log(dump());
 
-poke(5, 0x41); // JMP
-poke(6, 0x01); // DST_L
-poke(7, 0x00); // DST_H
+const NOP     = 0x00;
 
-for (let i = 0; i < 10; i++) {
-  console.log(pc());
+const LDA_Z   = 0x10;
+const LDA_I   = 0x11;
+const LDA     = 0x12;
+
+const STA_Z   = 0x20;
+const STA     = 0x22;
+
+const ADD     = 0x30;
+const SUB     = 0x31;
+
+const JMZ     = 0x40;
+const JMP     = 0x41;
+const JSR     = 0x42;
+const RET     = 0x43;
+
+
+const asm = [0x00, LDA_I, 0x98, STA, 0x00, 0x00, JMP, 0x03, 0x00]
+
+asm.forEach((a, i) => {
+  poke(i, a);
+});
+
+for (let i = 0; i < 20; i++) {
+  const d = dump();
+  console.log(`PC: ${d.pc} ZP: ${d.slice.map(hexify).join(" ")}`);
   vm.steps(1);
 
 }
