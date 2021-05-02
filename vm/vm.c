@@ -34,7 +34,9 @@ typedef struct {
   u8 flags;
 } state_t;
 
-__attribute__((export_name("init")))
+#define EXPORT __attribute__((visibility("default")))
+
+EXPORT
 void init() {
   GET_STATE;
   state->heap = (u8 *)HEAP_START;
@@ -44,7 +46,7 @@ void init() {
   state->pc = state->heap;
 }
 
-__attribute__((export_name("steps")))
+EXPORT
 void steps(u32 n) {
   GET_STATE;
   for (u32 i = 0; i < n; i++) {
