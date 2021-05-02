@@ -21,4 +21,4 @@ vm.wasm: vm.o
 	--strip-all -error-limit=0 --lto-O3 -O3  vm.o -o vm.wasm
 
 clean:
-	rm vm.o vm.wasm
+	rm -f vm.o vm.wasm
