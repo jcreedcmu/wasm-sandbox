@@ -246,14 +246,36 @@ const prog: Program = {
     {
       locals: [{ count: 2, tp: 'i32' }],
       e: [
+        // local 2 holds the length of the string
+        // local 3 holds a 0-indexed pointer into the string
+
         /* read zeroth byte from memory */
         { t: 'i32.const', n: 0 },
         { t: 'i32.load8_u', memarg: { align: 0, offset: 0 } },
         { t: 'local.tee', n: 2 },
+        { t: 'i32.const', n: 0 },
+        { t: 'local.set', n: 3 },
         { t: 'call', fidx: 0 /* log */ },
-        { t: 'local.get', n: 2 },
-        { t: 'call', fidx: 0 /* log */ },
+        {
+          t: 'loop', body: [
 
+            // load
+            { t: 'local.get', n: 3 },
+            { t: 'i32.load8_u', memarg: { align: 0, offset: 1 } },
+            // print
+            { t: 'call', fidx: 0 },
+            // increment
+            { t: 'local.get', n: 3 },
+            { t: 'i32.const', n: 1 },
+            { t: 'i32.add' },
+            { t: 'local.tee', n: 3 },
+            // compare to length
+            { t: 'local.get', n: 2 },
+            { t: 'i32.ne' },
+            // if ne, loop
+            { t: 'br_if', n: 0 }
+          ]
+        },
         { t: 'i32.const', n: 0 },
         { t: 'return' }
       ]

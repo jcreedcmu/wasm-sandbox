@@ -37,7 +37,6 @@ async function go() {
   const str = "Hello, World!\n";
   memset(memory, 0, str.length);
   strcpy(memory, 1, str);
-
   call_logger(1, 33); // emits: 1, 33, str.length=14
 
   document.write(results.join('<br/>'));
