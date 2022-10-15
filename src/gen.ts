@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 
 function uint(n: number): number[] {
   return (n < 128) ? [n] : [0x80 | (n & 0x7f), ...uint(n >> 7)];
@@ -15,14 +16,22 @@ type RefType = 'funcref' | 'externref';
 type ValType = NumType | RefType;
 type FuncType = { i: ValType[], o: ValType[] };
 type Import = { mod: string, nm: string, desc: ImportDesc };
+type Export = { nm: string, desc: ExportDesc };
 type ImportDesc =
-  | { t: 'func', tidx: number }
+  | { t: 'func', typeidx: number }
   | { t: 'table' }
   | { t: 'mem', memtype: MemType }
   | { t: 'global' };
+type ExportDesc =
+  | { t: 'func', idx: number }
+  | { t: 'table', idx: number }
+  | { t: 'mem', idx: number }
+  | { t: 'global', idx: number };
+
 type Program = {
   types: FuncType[],
   imports: Import[],
+  exports: Export[],
   functions: TypeIdx[],
   codes: FuncDefn[]
 };
@@ -35,6 +44,7 @@ type Instr =
   | { t: 'block', tp?: BlockType, body: Instr[] }
   | { t: 'i32.const', n: number }
   | { t: 'i32.ne' }
+  | { t: 'i32.add' }
   | { t: 'i32.eq' }
   | { t: 'i32.gt_s' }
   | { t: 'br_if', n: number }
@@ -55,6 +65,7 @@ type FuncDefn = {
 type Section =
   | { t: 'types', types: FuncType[] }
   | { t: 'imports', imports: Import[] }
+  | { t: 'exports', exports: Export[] }
   | { t: 'functions', functions: TypeIdx[] }
   | { t: 'codes', codes: FuncDefn[] };
 
@@ -88,6 +99,15 @@ function emitImportDesc(x: ImportDesc): number[] {
   }
 }
 
+function emitExportDesc(x: ExportDesc): number[] {
+  switch (x.t) {
+    case 'func': return [0x00, ...uint(x.idx)];
+    case 'table': return [0x01, ...uint(x.idx)];
+    case 'mem': return [0x02, ...uint(x.idx)];
+    case 'global': return [0x03, ...uint(x.idx)];
+  }
+}
+
 function emitString(x: string): number[] {
   const buf: number[] = [...Buffer.from(x, 'utf8')];
   return [...uint(buf.length), ...buf];
@@ -95,6 +115,10 @@ function emitString(x: string): number[] {
 
 function emitImport(x: Import): number[] {
   return [...emitString(x.mod), ...emitString(x.nm), ...emitImportDesc(x.desc)];
+}
+
+function emitExport(x: Export): number[] {
+  return [...emitString(x.nm), ...emitExportDesc(x.desc)];
 }
 
 function emitBlockType(x?: BlockType): number[] {
@@ -120,6 +144,7 @@ function emitInstr(x: Instr): number[] {
     case 'i32.eq': return [0x46];
     case 'i32.ne': return [0x47];
     case 'i32.gt_s': return [0x4a];
+    case 'i32.add': return [0x6a];
   }
 }
 
@@ -144,6 +169,7 @@ function sectionBody(s: Section): number[] {
   switch (s.t) {
     case 'types': return emitVector(s.types, emitFuncType);
     case 'imports': return emitVector(s.imports, emitImport);
+    case 'exports': return emitVector(s.exports, emitExport);
     case 'functions': return emitVector(s.functions, uint);
     case 'codes': return emitVector(s.codes, emitCode);
   }
@@ -157,6 +183,7 @@ function sectionId(s: Section): number {
   switch (s.t) {
     case 'types': return 1;
     case 'imports': return 2;
+    case 'exports': return 7;
     case 'functions': return 3;
     case 'codes': return 10;
   }
@@ -174,13 +201,17 @@ function emitSection(s: Section): number[] {
 function emit(p: Program): Uint8Array {
   const magic = [0x00, 0x61, 0x73, 0x6d]; // "\x00asm";
   const moduleVersion = [0x01, 0x00, 0x00, 0x00];
-  const { types, imports, functions, codes } = p;
+  const { types, imports, functions, codes, exports } = p;
+  // Note that although sections may be optionally missing, the order
+  // of any sections that are present must match §5.5.2 of
+  // https://webassembly.github.io/spec/core/_download/WebAssembly.pdf
   return Uint8Array.from([
     ...magic,
     ...moduleVersion,
     ...emitSection({ t: 'types', types }),
     ...emitSection({ t: 'imports', imports }),
     ...emitSection({ t: 'functions', functions }),
+    ...emitSection({ t: 'exports', exports }),
     ...emitSection({ t: 'codes', codes }),
   ]);
 }
@@ -188,9 +219,19 @@ function emit(p: Program): Uint8Array {
 async function go() {
   const p: Program = {
     types: [
+      { i: ['i32', 'i32'], o: ['i32'] },
       { i: ['i32'], o: ['i32'] }
     ],
+    functions: [0, 1],
     codes: [
+      {
+        locals: [], e: [
+          { t: 'local.get', n: 0 },
+          { t: 'local.get', n: 1 },
+          { t: 'i32.add' },
+          { t: 'return' }
+        ]
+      },
       {
         locals: [], e: [
           {
@@ -227,7 +268,10 @@ async function go() {
         ]
       },
     ],
-    functions: [0],
+    exports: [
+      { nm: 'foo', desc: { t: 'func', idx: 0 } },
+      { nm: 'blarg', desc: { t: 'func', idx: 1 } }
+    ],
     imports: [{
       mod: 'env', nm: '__linear_memory',
       desc: { t: 'mem', memtype: { min: 0 } }
@@ -235,7 +279,7 @@ async function go() {
   }
   const bytes = emit(p);
   console.log(bytes);
-  fs.writeFileSync('/tmp/a.wasm', bytes);
+  fs.writeFileSync(path.join(__dirname, "../public/a.wasm"), bytes);
   const instance = await WebAssembly.instantiate(bytes, {
     env: {
       __linear_memory: new WebAssembly.Memory({ initial: 0 })

@@ -1,3 +1,4 @@
 out/*.js
 out/*.js.map
 node_modules
+public/a.wasm
