@@ -1,7 +1,8 @@
 <script>
   async function init() {
-    const x = await (WebAssembly.instantiateStreaming(fetch("./a.wasm", {cache: "no-cache"}), { env: {
-      __linear_memory: new WebAssembly.Memory({ initial: 0 })
+    const x = await (WebAssembly.instantiateStreaming(fetch("./a.wasm", {cache: "no-store"}), { env: {
+      __linear_memory: new WebAssembly.Memory({ initial: 0 }),
+      log: (a, b) => { console.log('success', a, b); return 42; }
     }}));
     const e = x.instance.exports;
     for (k of Object.keys(e)) {
@@ -16,6 +17,7 @@
 
     show(foo(100,23)); // 123
     show([99,100,101,299,300,301,399,400,401].map(blarg)); // [257,2,257,257,4,257,257,5,257]
+    show(call_logger(1,5)); // 42, console.log('success 1 5');
 
     document.write(results.join('<br/>'));
   }

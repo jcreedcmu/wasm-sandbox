@@ -51,7 +51,8 @@ type Instr =
   | { t: 'local.get', n: number }
   | { t: 'return' }
   | { t: 'drop' }
-  | { t: 'select' };
+  | { t: 'select' }
+  | { t: 'call', fidx: number };
 
 
 type Expr = Instr[];
@@ -94,8 +95,9 @@ function emitFuncType(x: FuncType): number[] {
 
 function emitImportDesc(x: ImportDesc): number[] {
   switch (x.t) {
+    case 'func': return [0x00, ...uint(x.typeidx)];
     case 'mem': return [0x02, ...emitMemType(x.memtype)];
-    default: throw `unsupported ${x}`;
+    default: throw new Error(`unsupported import type '${x.t}'`);
   }
 }
 
@@ -145,6 +147,7 @@ function emitInstr(x: Instr): number[] {
     case 'i32.ne': return [0x47];
     case 'i32.gt_s': return [0x4a];
     case 'i32.add': return [0x6a];
+    case 'call': return [0x10, ...uint(x.fidx)];
   }
 }
 
@@ -216,76 +219,99 @@ function emit(p: Program): Uint8Array {
   ]);
 }
 
+const prog: Program = {
+  types: [
+    { i: ['i32', 'i32'], o: ['i32'] },
+    { i: ['i32'], o: ['i32'] }
+  ],
+  functions: [0, 0, 1],
+  codes: [
+    {
+      locals: [],
+      e: [
+        { t: 'local.get', n: 0 },
+        { t: 'local.get', n: 1 },
+        { t: 'call', fidx: 0 },
+        { t: 'return' }
+      ]
+    },
+    {
+      locals: [], e: [
+        { t: 'local.get', n: 0 },
+        { t: 'local.get', n: 1 },
+        { t: 'i32.add' },
+        { t: 'return' }
+      ]
+    },
+    {
+      locals: [], e: [
+        {
+          t: 'block', body: [
+            { t: 'local.get', n: 0 },
+            { t: 'i32.const', n: 100 },
+            { t: 'i32.ne' },
+            { t: 'br_if', n: 0 },
+            { t: 'i32.const', n: 2 },
+            { t: 'return' },
+          ]
+        },
+        {
+          t: 'block', body: [
+            {
+              t: 'block', body: [
+                { t: 'local.get', n: 0 },
+                { t: 'i32.const', n: 400 },
+                { t: 'i32.eq' },
+                { t: 'br_if', n: 0 },
+                { t: 'local.get', n: 0 },
+                { t: 'i32.const', n: 300 },
+                { t: 'i32.ne' },
+                { t: 'br_if', n: 1 },
+                { t: 'i32.const', n: 4 },
+                { t: 'return' },
+              ]
+            },
+            { t: 'i32.const', n: 5 },
+            { t: 'return' },
+          ]
+        },
+        { t: 'i32.const', n: 256 },
+      ]
+    },
+  ],
+  exports: [
+    { nm: 'call_logger', desc: { t: 'func', idx: 1 } },
+    { nm: 'foo', desc: { t: 'func', idx: 2 } },
+    { nm: 'blarg', desc: { t: 'func', idx: 3 } }
+  ],
+  imports: [{
+    mod: 'env',
+    nm: '__linear_memory',
+    desc: { t: 'mem', memtype: { min: 0 } }
+  },
+  {
+    mod: 'env',
+    nm: 'log',
+    desc: { t: 'func', typeidx: 0 },
+  }],
+};
+
 async function go() {
-  const p: Program = {
-    types: [
-      { i: ['i32', 'i32'], o: ['i32'] },
-      { i: ['i32'], o: ['i32'] }
-    ],
-    functions: [0, 1],
-    codes: [
-      {
-        locals: [], e: [
-          { t: 'local.get', n: 0 },
-          { t: 'local.get', n: 1 },
-          { t: 'i32.add' },
-          { t: 'return' }
-        ]
-      },
-      {
-        locals: [], e: [
-          {
-            t: 'block', body: [
-              { t: 'local.get', n: 0 },
-              { t: 'i32.const', n: 100 },
-              { t: 'i32.ne' },
-              { t: 'br_if', n: 0 },
-              { t: 'i32.const', n: 2 },
-              { t: 'return' },
-            ]
-          },
-          {
-            t: 'block', body: [
-              {
-                t: 'block', body: [
-                  { t: 'local.get', n: 0 },
-                  { t: 'i32.const', n: 400 },
-                  { t: 'i32.eq' },
-                  { t: 'br_if', n: 0 },
-                  { t: 'local.get', n: 0 },
-                  { t: 'i32.const', n: 300 },
-                  { t: 'i32.ne' },
-                  { t: 'br_if', n: 1 },
-                  { t: 'i32.const', n: 4 },
-                  { t: 'return' },
-                ]
-              },
-              { t: 'i32.const', n: 5 },
-              { t: 'return' },
-            ]
-          },
-          { t: 'i32.const', n: 257 },
-        ]
-      },
-    ],
-    exports: [
-      { nm: 'foo', desc: { t: 'func', idx: 0 } },
-      { nm: 'blarg', desc: { t: 'func', idx: 1 } }
-    ],
-    imports: [{
-      mod: 'env', nm: '__linear_memory',
-      desc: { t: 'mem', memtype: { min: 0 } }
-    }],
+  try {
+    const bytes = emit(prog);
+    console.log(bytes);
+    fs.writeFileSync(path.join(__dirname, "../public/a.wasm"), bytes);
+    const instance = await WebAssembly.instantiate(bytes, {
+      env: {
+        __linear_memory: new WebAssembly.Memory({ initial: 0 }),
+        log: (a: number, b: number) => { console.log('success', a, b); }
+      }
+    });
+    console.log('ok');
   }
-  const bytes = emit(p);
-  console.log(bytes);
-  fs.writeFileSync(path.join(__dirname, "../public/a.wasm"), bytes);
-  const instance = await WebAssembly.instantiate(bytes, {
-    env: {
-      __linear_memory: new WebAssembly.Memory({ initial: 0 })
-    }
-  });
-  console.log('ok');
+  catch (e) {
+    console.log('error', e);
+  }
 }
 
 go();
