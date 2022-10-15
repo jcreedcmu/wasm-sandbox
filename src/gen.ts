@@ -38,6 +38,11 @@ type Program = {
 
 type BlockType = number | ValType;
 
+type MemArg = {
+  align: number,
+  offset: number,
+};
+
 type Instr =
   | { t: 'unreachable' }
   | { t: 'nop' }
@@ -52,7 +57,8 @@ type Instr =
   | { t: 'return' }
   | { t: 'drop' }
   | { t: 'select' }
-  | { t: 'call', fidx: number };
+  | { t: 'call', fidx: number }
+  | { t: 'i32.load8_u', memarg: MemArg };
 
 
 type Expr = Instr[];
@@ -148,6 +154,7 @@ function emitInstr(x: Instr): number[] {
     case 'i32.gt_s': return [0x4a];
     case 'i32.add': return [0x6a];
     case 'call': return [0x10, ...uint(x.fidx)];
+    case 'i32.load8_u': return [0x2d, ...uint(x.memarg.align), ...uint(x.memarg.offset)];
   }
 }
 
@@ -226,15 +233,18 @@ const prog: Program = {
   ],
   functions: [0, 0, 1],
   codes: [
+    // 1: call_logger
     {
       locals: [],
       e: [
         { t: 'local.get', n: 0 },
-        { t: 'local.get', n: 1 },
+        { t: 'i32.const', n: 0 },
+        { t: 'i32.load8_u', memarg: { align: 0, offset: 0 } },
         { t: 'call', fidx: 0 },
         { t: 'return' }
       ]
     },
+    // 2: foo
     {
       locals: [], e: [
         { t: 'local.get', n: 0 },
@@ -243,6 +253,7 @@ const prog: Program = {
         { t: 'return' }
       ]
     },
+    // 3: blarg
     {
       locals: [], e: [
         {
