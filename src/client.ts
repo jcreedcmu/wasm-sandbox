@@ -12,7 +12,7 @@ async function init(memory: WebAssembly.Memory) {
   const x = await (WebAssembly.instantiateStreaming(fetch("./a.wasm", { cache: "no-store" }), {
     env: {
       __linear_memory: memory,
-      log: (a: number, b: number) => { console.log('success', a, b); return 42; }
+      log: (a: number) => { console.log('serial port out of wasm:', a); }
     }
   }));
   const e = x.instance.exports;
@@ -37,8 +37,7 @@ async function go() {
   memset(memory, 0, str.length);
   strcpy(memory, 1, str);
 
-  const _unused = 33;
-  show(call_logger(1, _unused)); // 42, console.log('success 1 14');
+  call_logger(1, 33); // emits: 1, 33, str.length=14
 
   document.write(results.join('<br/>'));
 }

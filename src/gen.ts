@@ -54,6 +54,7 @@ type Instr =
   | { t: 'i32.gt_s' }
   | { t: 'br_if', n: number }
   | { t: 'local.get', n: number }
+  | { t: 'local.set', n: number }
   | { t: 'return' }
   | { t: 'drop' }
   | { t: 'select' }
@@ -63,7 +64,7 @@ type Instr =
 
 type Expr = Instr[];
 
-type Local = { n: number, t: ValType };
+type Local = { count: number, tp: ValType };
 type FuncDefn = {
   locals: Local[];
   e: Expr;
@@ -144,6 +145,7 @@ function emitInstr(x: Instr): number[] {
     case 'nop': return [0x01];
     case 'block': return [0x02, ...emitBlockType(x.tp), ...x.body.flatMap(emitInstr), 0x0b];
     case 'local.get': return [0x20, ...uint(x.n)];
+    case 'local.set': return [0x21, ...uint(x.n)];
     case 'br_if': return [0x0d, ...uint(x.n)];
     case 'return': return [0x0f];
     case 'drop': return [0x1a];
@@ -158,8 +160,8 @@ function emitInstr(x: Instr): number[] {
   }
 }
 
-function emitLocal(x: Local): number[] {
-  return [...uint(x.n), ...emitValType(x.t)];
+function emitLocal(local: Local): number[] {
+  return [...uint(local.count), ...emitValType(local.tp)];
 }
 
 function _emitCode(x: FuncDefn): number[] {
@@ -193,14 +195,16 @@ function sectionId(s: Section): number {
   switch (s.t) {
     case 'types': return 1;
     case 'imports': return 2;
-    case 'exports': return 7;
     case 'functions': return 3;
+    case 'exports': return 7;
     case 'codes': return 10;
   }
 }
 
 function emitSection(s: Section): number[] {
   const body = sectionBody(s);
+  console.log('sectionId ', sectionId(s));
+  console.log('bodyLength ', body.length);
   return [
     ...uint(sectionId(s)),
     ...uint(body.length),
@@ -229,18 +233,24 @@ function emit(p: Program): Uint8Array {
 const prog: Program = {
   types: [
     { i: ['i32', 'i32'], o: ['i32'] },
-    { i: ['i32'], o: ['i32'] }
+    { i: ['i32'], o: ['i32'] },
+    { i: ['i32'], o: [] }
   ],
   functions: [0, 0, 1],
   codes: [
     // 1: call_logger
     {
-      locals: [],
+      locals: [{ count: 2, tp: 'i32' }],
       e: [
         { t: 'local.get', n: 0 },
+        { t: 'call', fidx: 0 /* log */ },
+        { t: 'local.get', n: 1 },
+        { t: 'call', fidx: 0 /* log */ },
+        /* read zeroth byte from memory */
         { t: 'i32.const', n: 0 },
         { t: 'i32.load8_u', memarg: { align: 0, offset: 0 } },
-        { t: 'call', fidx: 0 },
+        { t: 'call', fidx: 0 /* log */ },
+        { t: 'i32.const', n: 0 },
         { t: 'return' }
       ]
     },
@@ -303,7 +313,7 @@ const prog: Program = {
   {
     mod: 'env',
     nm: 'log',
-    desc: { t: 'func', typeidx: 0 },
+    desc: { t: 'func', typeidx: 2 },
   }],
 };
 
