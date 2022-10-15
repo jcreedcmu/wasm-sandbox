@@ -9,7 +9,8 @@ function memset(memory: WebAssembly.Memory, offset: number, val: number) {
 }
 
 async function init(memory: WebAssembly.Memory) {
-  const x = await (WebAssembly.instantiateStreaming(fetch("./a.wasm", { cache: "no-store" }), {
+  const resp = await fetch("./a.wasm", { cache: "no-store" });
+  const x = await (WebAssembly.instantiateStreaming(resp, {
     env: {
       __linear_memory: memory,
       log: (a: number) => { console.log('serial port out of wasm:', a); }
@@ -26,7 +27,7 @@ declare function blarg(x: number): number;
 declare function call_logger(x: number, y: number): number;
 
 async function go() {
-  const memory = new WebAssembly.Memory({ initial: 65536 });
+  const memory = new WebAssembly.Memory({ initial: 1 });
 
   await init(memory);
   const results: string[] = [];

@@ -47,6 +47,7 @@ type Instr =
   | { t: 'unreachable' }
   | { t: 'nop' }
   | { t: 'block', tp?: BlockType, body: Instr[] }
+  | { t: 'loop', tp?: BlockType, body: Instr[] }
   | { t: 'i32.const', n: number }
   | { t: 'i32.ne' }
   | { t: 'i32.add' }
@@ -55,6 +56,7 @@ type Instr =
   | { t: 'br_if', n: number }
   | { t: 'local.get', n: number }
   | { t: 'local.set', n: number }
+  | { t: 'local.tee', n: number }
   | { t: 'return' }
   | { t: 'drop' }
   | { t: 'select' }
@@ -144,8 +146,10 @@ function emitInstr(x: Instr): number[] {
     case 'unreachable': return [0x00];
     case 'nop': return [0x01];
     case 'block': return [0x02, ...emitBlockType(x.tp), ...x.body.flatMap(emitInstr), 0x0b];
+    case 'loop': return [0x03, ...emitBlockType(x.tp), ...x.body.flatMap(emitInstr), 0x0b];
     case 'local.get': return [0x20, ...uint(x.n)];
     case 'local.set': return [0x21, ...uint(x.n)];
+    case 'local.tee': return [0x22, ...uint(x.n)];
     case 'br_if': return [0x0d, ...uint(x.n)];
     case 'return': return [0x0f];
     case 'drop': return [0x1a];
@@ -242,14 +246,14 @@ const prog: Program = {
     {
       locals: [{ count: 2, tp: 'i32' }],
       e: [
-        { t: 'local.get', n: 0 },
-        { t: 'call', fidx: 0 /* log */ },
-        { t: 'local.get', n: 1 },
-        { t: 'call', fidx: 0 /* log */ },
         /* read zeroth byte from memory */
         { t: 'i32.const', n: 0 },
         { t: 'i32.load8_u', memarg: { align: 0, offset: 0 } },
+        { t: 'local.tee', n: 2 },
         { t: 'call', fidx: 0 /* log */ },
+        { t: 'local.get', n: 2 },
+        { t: 'call', fidx: 0 /* log */ },
+
         { t: 'i32.const', n: 0 },
         { t: 'return' }
       ]
