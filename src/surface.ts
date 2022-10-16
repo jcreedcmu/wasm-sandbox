@@ -171,10 +171,18 @@ export function assemble(p: Program): wasm.Program {
       default: return [];
     }
   }
+
+  function getTables(d: Decl): wasm.TableDefn[] {
+    switch (d.t) {
+      default: return [];
+    }
+  }
+
   const codes = p.flatMap(d => getCodes(d));
   const functions = p.flatMap(d => getFunctions(d));
   const imports = p.flatMap(d => getImports(d));
   const types: wasm.FuncType[] = ptypes.map(t => ({ i: t.args, o: t.ret }));
   const exports = p.flatMap(d => getExports(d));
-  return { codes, exports, functions, imports, types };
+  const tables = p.flatMap(d => getTables(d));
+  return { codes, exports, functions, imports, types, tables };
 }

@@ -7,12 +7,22 @@ function sint(n: number): number[] {
 }
 
 export type TypeIdx = number;
-export type MemType =
-  {
-    // these are both counted in number of 65KB pages
-    min: number,
-    max?: number
-  };
+
+// This is used for table size limits, and the fields are counted in
+// number of table entries.
+export type Limits = {
+  min: number,
+  max?: number,
+};
+
+
+// This is extensionally the same type as Limits, but it's used for
+// memory limits, and the fields are counting in number of 65KB pages
+export type MemType = {
+  min: number,
+  max?: number
+};
+
 type NumType = 'i32' | 'f32' | 'i64' | 'f64';
 type RefType = 'funcref' | 'externref';
 export type ValType = NumType | RefType;
@@ -36,6 +46,7 @@ export type Program = {
   exports: Export[],
   functions: TypeIdx[],
   codes: FuncDefn[]
+  tables: TableDefn[],
 };
 
 export type BlockType = number | ValType;
@@ -74,12 +85,24 @@ export type FuncDefn = {
   e: Expr;
 }
 
+export type TableType = { ref: RefType, limits: Limits };
+export type TableDefn = { tp: TableType };
+
 type Section =
   | { t: 'types', types: FuncType[] }
   | { t: 'imports', imports: Import[] }
   | { t: 'exports', exports: Export[] }
   | { t: 'functions', functions: TypeIdx[] }
-  | { t: 'codes', codes: FuncDefn[] };
+  | { t: 'codes', codes: FuncDefn[] }
+  | { t: 'tables', tables: TableDefn[] };
+
+
+function emitRefType(x: RefType): number[] {
+  switch (x) {
+    case 'funcref': return [0x70];
+    case 'externref': return [0x6f];
+  }
+}
 
 function emitValType(x: ValType): number[] {
   switch (x) {
@@ -93,6 +116,10 @@ function emitValType(x: ValType): number[] {
 }
 
 function emitMemType(x: MemType): number[] {
+  return emitLimits(x);
+}
+
+function emitLimits(x: Limits): number[] {
   return x.max === undefined ?
     [0x00, ...uint(x.min)] :
     [0x01, ...uint(x.min), ...uint(x.max)];
@@ -183,6 +210,10 @@ function emitCode(x: FuncDefn): number[] {
   return [...uint(funcDefnEncoded.length), ...funcDefnEncoded];
 }
 
+function emitTable(x: TableDefn): number[] {
+  return [...emitRefType(x.tp.ref), ...emitLimits(x.tp.limits)];
+}
+
 function sectionBody(s: Section): number[] {
   switch (s.t) {
     case 'types': return emitVector(s.types, emitFuncType);
@@ -190,6 +221,7 @@ function sectionBody(s: Section): number[] {
     case 'exports': return emitVector(s.exports, emitExport);
     case 'functions': return emitVector(s.functions, uint);
     case 'codes': return emitVector(s.codes, emitCode);
+    case 'tables': return emitVector(s.tables, emitTable);
   }
 }
 
@@ -202,6 +234,7 @@ function sectionId(s: Section): number {
     case 'types': return 1;
     case 'imports': return 2;
     case 'functions': return 3;
+    case 'tables': return 4;
     case 'exports': return 7;
     case 'codes': return 10;
   }
@@ -219,7 +252,7 @@ function emitSection(s: Section): number[] {
 export function emit(p: Program): Uint8Array {
   const magic = [0x00, 0x61, 0x73, 0x6d]; // "\x00asm";
   const moduleVersion = [0x01, 0x00, 0x00, 0x00];
-  const { types, imports, functions, codes, exports } = p;
+  const { types, imports, functions, codes, exports, tables } = p;
   // Note that although sections may be optionally missing, the order
   // of any sections that are present must match §5.5.2 of
   // https://webassembly.github.io/spec/core/_download/WebAssembly.pdf
@@ -229,6 +262,7 @@ export function emit(p: Program): Uint8Array {
     ...emitSection({ t: 'types', types }),
     ...emitSection({ t: 'imports', imports }),
     ...emitSection({ t: 'functions', functions }),
+    ...emitSection({ t: 'tables', tables }),
     ...emitSection({ t: 'exports', exports }),
     ...emitSection({ t: 'codes', codes }),
   ]);
