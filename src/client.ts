@@ -25,6 +25,7 @@ async function init(memory: WebAssembly.Memory) {
 declare function foo(x: number, y: number): void;
 declare function blarg(x: number): number;
 declare function call_logger(x: number, y: number): number;
+declare function table_call(f: 0 | 1, x: number): number;
 
 async function go() {
   const memory = new WebAssembly.Memory({ initial: 1 });
@@ -38,6 +39,9 @@ async function go() {
   memset(memory, 0, str.length);
   strcpy(memory, 1, str);
   call_logger(1, 33); // emits: 1, 33, str.length=14
+
+  show(table_call(0, 11)); // 111
+  show(table_call(1, 22)); // 222
 
   document.write(results.join('<br/>'));
 }

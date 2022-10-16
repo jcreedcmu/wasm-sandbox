@@ -87,9 +87,30 @@ const sprog: surface.Program = [
       { t: 'i32.const', n: 257 },
     ]
   },
+  {
+    t: 'func', name: 'table_entry_1', doExport: false, decl: { args: [{ name: 'x', tp: 'i32' }], ret: ['i32'] }, locals: [], body: [
+      { t: 'local.get', n: 'x' },
+      { t: 'i32.const', n: 100 },
+      { t: 'i32.add' },
+    ]
+  },
+  {
+    t: 'func', name: 'table_entry_2', doExport: false, decl: { args: [{ name: 'x', tp: 'i32' }], ret: ['i32'] }, locals: [], body: [
+      { t: 'local.get', n: 'x' },
+      { t: 'i32.const', n: 200 },
+      { t: 'i32.add' },
+    ]
+  },
+  {
+    t: 'func', name: 'table_call', decl: { args: [{ name: 'f', tp: 'i32' }, { name: 'x', tp: 'i32' }], ret: ['i32'] }, locals: [], body: [
+      { t: 'local.get', n: 'x' },
+      { t: 'local.get', n: 'f' },
+      { t: 'call_indirect', tp: { args: ['i32'], ret: ['i32'] } },
+    ]
+  },
   { t: 'importFunc', name: 'log', tp: { args: ['i32'], ret: [] } },
   { t: 'importMem', name: '__linear_memory', mt: { min: 1 } },
-  { t: 'table', funcs: ['call_logger', 'blarg', 'foo'] },
+  { t: 'table', funcs: ['table_entry_1', 'table_entry_2'] },
 ];
 
 async function go() {

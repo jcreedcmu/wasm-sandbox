@@ -78,6 +78,7 @@ export type Instr =
   | { t: 'drop' }
   | { t: 'select' }
   | { t: 'call', f: number }
+  | { t: 'call_indirect', tpidx: number }
   | { t: 'i32.load8_u', memarg: MemArg };
 
 
@@ -194,6 +195,7 @@ function emitInstr(x: Instr): number[] {
     case 'i32.gt_s': return [0x4a];
     case 'i32.add': return [0x6a];
     case 'call': return [0x10, ...uint(x.f)];
+    case 'call_indirect': return [0x11, ...uint(x.tpidx), ...uint(0)];
     case 'i32.load8_u': return [0x2d, ...uint(x.memarg.align), ...uint(x.memarg.offset)];
   }
 }

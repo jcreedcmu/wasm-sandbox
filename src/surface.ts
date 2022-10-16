@@ -24,6 +24,7 @@ export type Instr =
   | { t: 'drop' }
   | { t: 'select' }
   | { t: 'call', f: string }
+  | { t: 'call_indirect', tp: FuncType }
   | { t: 'i32.load8_u', memarg: wasm.MemArg };
 
 export type FuncDecl = { args: Arg[], ret: ValType[] };
@@ -72,6 +73,8 @@ function typesOfProgram(p: Program): { numberOfType: Record<string, number>, typ
         if (typeof ins.tp == 'object')
           collectTp(ins.tp);
         ins.body.forEach(ins => collectInstruction(ins));
+        break;
+      case 'call_indirect': collectTp(ins.tp); break;
       default:
     }
   }
@@ -158,6 +161,7 @@ export function assemble(p: Program): wasm.Program {
       case 'local.set': return { t: 'local.set', n: lookupLocal(ins.n) };
       case 'local.tee': return { t: 'local.tee', n: lookupLocal(ins.n) };
       case 'call': return { t: 'call', f: lookupFunc(ins.f) };
+      case 'call_indirect': return { t: 'call_indirect', tpidx: numberOfType[stringOfFunctionType(ins.tp)] };
       default: return ins;
     }
   }
