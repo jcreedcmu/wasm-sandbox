@@ -40,6 +40,9 @@ type ExportDesc =
   | { t: 'mem', idx: number }
   | { t: 'global', idx: number };
 
+export type ElemDefn =
+  | { t: 'functable', fidxs: number[] };
+
 export type Program = {
   types: FuncType[],
   imports: Import[],
@@ -47,6 +50,7 @@ export type Program = {
   functions: TypeIdx[],
   codes: FuncDefn[]
   tables: TableDefn[],
+  elems: ElemDefn[],
 };
 
 export type BlockType = number | ValType;
@@ -94,7 +98,8 @@ type Section =
   | { t: 'exports', exports: Export[] }
   | { t: 'functions', functions: TypeIdx[] }
   | { t: 'codes', codes: FuncDefn[] }
-  | { t: 'tables', tables: TableDefn[] };
+  | { t: 'tables', tables: TableDefn[] }
+  | { t: 'elems', elems: ElemDefn[] };
 
 
 function emitRefType(x: RefType): number[] {
@@ -214,6 +219,10 @@ function emitTable(x: TableDefn): number[] {
   return [...emitRefType(x.tp.ref), ...emitLimits(x.tp.limits)];
 }
 
+function emitElem(x: ElemDefn): number[] {
+  return [0x00, ...emitInstr({ t: 'i32.const', n: 0 }), 0x0b, ...emitVector(x.fidxs, uint)];
+}
+
 function sectionBody(s: Section): number[] {
   switch (s.t) {
     case 'types': return emitVector(s.types, emitFuncType);
@@ -222,6 +231,7 @@ function sectionBody(s: Section): number[] {
     case 'functions': return emitVector(s.functions, uint);
     case 'codes': return emitVector(s.codes, emitCode);
     case 'tables': return emitVector(s.tables, emitTable);
+    case 'elems': return emitVector(s.elems, emitElem);
   }
 }
 
@@ -236,6 +246,7 @@ function sectionId(s: Section): number {
     case 'functions': return 3;
     case 'tables': return 4;
     case 'exports': return 7;
+    case 'elems': return 9;
     case 'codes': return 10;
   }
 }
@@ -252,7 +263,7 @@ function emitSection(s: Section): number[] {
 export function emit(p: Program): Uint8Array {
   const magic = [0x00, 0x61, 0x73, 0x6d]; // "\x00asm";
   const moduleVersion = [0x01, 0x00, 0x00, 0x00];
-  const { types, imports, functions, codes, exports, tables } = p;
+  const { types, imports, functions, codes, exports, tables, elems } = p;
   // Note that although sections may be optionally missing, the order
   // of any sections that are present must match §5.5.2 of
   // https://webassembly.github.io/spec/core/_download/WebAssembly.pdf
@@ -264,6 +275,7 @@ export function emit(p: Program): Uint8Array {
     ...emitSection({ t: 'functions', functions }),
     ...emitSection({ t: 'tables', tables }),
     ...emitSection({ t: 'exports', exports }),
+    ...emitSection({ t: 'elems', elems }),
     ...emitSection({ t: 'codes', codes }),
   ]);
 }

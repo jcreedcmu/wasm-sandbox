@@ -89,7 +89,7 @@ const sprog: surface.Program = [
   },
   { t: 'importFunc', name: 'log', tp: { args: ['i32'], ret: [] } },
   { t: 'importMem', name: '__linear_memory', mt: { min: 1 } },
-  { t: 'table', name: 'jumptable', limits: { min: 0 } },
+  { t: 'table', funcs: ['call_logger', 'blarg', 'foo'] },
 ];
 
 async function go() {

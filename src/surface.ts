@@ -33,7 +33,7 @@ export type Decl =
   | { t: 'importFunc', name: string, tp: FuncType }
   | { t: 'importMem', name: string, mt: wasm.MemType }
   | { t: 'func', name: string, locals: Arg[], decl: FuncDecl, doExport?: boolean, body: Instr[] }
-  | { t: 'table', name: string, limits: wasm.Limits }
+  | { t: 'table', funcs: string[] }
 
 export type Program = Decl[];
 
@@ -176,7 +176,14 @@ export function assemble(p: Program): wasm.Program {
   function getTables(d: Decl): wasm.TableDefn[] {
     switch (d.t) {
       // I think non-imported tables must be funcref
-      case 'table': return [{ tp: { ref: 'funcref', limits: d.limits } }];
+      case 'table': return [{ tp: { ref: 'funcref', limits: { min: d.funcs.length, max: d.funcs.length } } }];
+      default: return [];
+    }
+  }
+
+  function getElems(d: Decl): wasm.ElemDefn[] {
+    switch (d.t) {
+      case 'table': return [{ t: 'functable', fidxs: d.funcs.map(lookupFunc) }];
       default: return [];
     }
   }
@@ -187,5 +194,6 @@ export function assemble(p: Program): wasm.Program {
   const types: wasm.FuncType[] = ptypes.map(t => ({ i: t.args, o: t.ret }));
   const exports = p.flatMap(d => getExports(d));
   const tables = p.flatMap(d => getTables(d));
-  return { codes, exports, functions, imports, types, tables };
+  const elems = p.flatMap(d => getElems(d));
+  return { codes, exports, functions, imports, types, tables, elems };
 }
