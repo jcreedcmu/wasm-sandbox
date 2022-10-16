@@ -209,8 +209,6 @@ function sectionId(s: Section): number {
 
 function emitSection(s: Section): number[] {
   const body = sectionBody(s);
-  console.log('sectionId ', sectionId(s));
-  console.log('bodyLength ', body.length);
   return [
     ...uint(sectionId(s)),
     ...uint(body.length),

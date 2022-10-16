@@ -1,9 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
-
+import * as surface from './surface';
 import { Program, emit } from './wasm-lib';
 
-const prog: Program = {
+const old_prog: Program = {
   types: [
     { i: ['i32', 'i32'], o: ['i32'] },
     { i: ['i32'], o: ['i32'] },
@@ -112,8 +112,32 @@ const prog: Program = {
   }],
 };
 
+const sprog: surface.Program = [
+  {
+    t: 'func', name: 'bar',
+    decl: { args: [{ name: 'baz', tp: 'i32' }, { name: 'mumble', tp: 'i32' }], ret: ['i32'] },
+    body: [
+      { t: 'local.get', n: 'mumble' },
+      { t: 'local.get', n: 'baz' },
+      { t: 'i32.add' },
+      { t: 'return' }
+    ], locals: [],
+  },
+  {
+    t: 'func', name: 'foo',
+    decl: { args: [{ name: 'n', tp: 'i32' }], ret: ['i32'] },
+    body: [
+      { t: 'i32.const', n: 12 },
+      { t: 'local.get', n: 'n' },
+      { t: 'call', f: 'bar' },
+      { t: 'return' }
+    ], locals: [],
+  },
+];
+
 async function go() {
   try {
+    const prog = surface.assemble(sprog);
     const bytes = emit(prog);
     console.log(bytes);
     fs.writeFileSync(path.join(__dirname, "../public/a.wasm"), bytes);

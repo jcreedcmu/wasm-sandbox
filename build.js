@@ -2,13 +2,14 @@ const { build } = require('esbuild')
 
 const args = process.argv.slice(2);
 
+const entryPoints =['./src/gen.ts', './src/surface.ts', './src/wasm-lib.ts'];
 
 async function go() {
 
   if (args[0] == 'all') {
     await Promise.all([
       build({
-	     entryPoints: ['./src/gen.ts'],
+	     entryPoints: entryPoints,
 	     minify: false,
 	     sourcemap: true,
 	     bundle: false,
@@ -30,7 +31,7 @@ async function go() {
   }
   else {
     await build({
-	   entryPoints: ['./src/gen.ts'],
+	   entryPoints: entryPoints,
 	   minify: false,
 	   sourcemap: true,
 	   bundle: false,
