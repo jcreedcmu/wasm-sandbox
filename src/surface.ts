@@ -9,8 +9,8 @@ type BlockType = FuncType | ValType;
 export type Instr =
   | { t: 'unreachable' }
   | { t: 'nop' }
-  | { t: 'block', label: string, tp?: BlockType, body: Instr[] }
-  | { t: 'loop', label: string, tp?: BlockType, body: Instr[] }
+  | { t: 'block', label?: string, tp?: BlockType, body: Instr[] }
+  | { t: 'loop', label?: string, tp?: BlockType, body: Instr[] }
   | { t: 'i32.const', n: number }
   | { t: 'i32.ne' }
   | { t: 'i32.add' }
@@ -23,7 +23,7 @@ export type Instr =
   | { t: 'return' }
   | { t: 'drop' }
   | { t: 'select' }
-  | { t: 'call', fidx: string }
+  | { t: 'call', f: string }
   | { t: 'i32.load8_u', memarg: wasm.MemArg };
 
 export type FuncDecl = { args: Arg[], ret: ValType[] };
@@ -32,7 +32,7 @@ export type FuncType = { args: ValType[], ret: ValType[] };
 export type Decl =
   | { t: 'importFunc', name: string, tp: FuncType }
   | { t: 'importMem', name: string, mt: wasm.MemType }
-  | { t: 'func', name: string, decl: FuncDecl, doExport?: boolean, body: Instr[] }
+  | { t: 'func', name: string, locals: Arg[], decl: FuncDecl, doExport?: boolean, body: Instr[] }
 
 export type Program = Decl[];
 
@@ -88,13 +88,20 @@ function typesOfProgram(p: Program): { numberOfType: Record<string, number>, typ
   return { numberOfType, types };
 }
 
-function assemble(p: Program): wasm.Program {
+export function assemble(p: Program): wasm.Program {
   const { numberOfType, types: ptypes } = typesOfProgram(p);
   const numberOfFunc = numberFuncs(p);
+  function lookupFunc(label: string): number {
+    const ix = numberOfFunc[label];
+    if (ix == undefined) {
+      throw new Error(`Can't find local '${label}'`);
+    }
+    return ix;
+  }
 
   function getExports(d: Decl): wasm.Export[] {
     switch (d.t) {
-      case 'func': return (d.doExport ?? true) ? [{ nm: d.name, desc: { t: 'func', idx: numberOfFunc[d.name] } }] : [];
+      case 'func': return (d.doExport ?? true) ? [{ nm: d.name, desc: { t: 'func', idx: lookupFunc(d.name) } }] : [];
       default: return [];
     }
   }
@@ -113,7 +120,58 @@ function assemble(p: Program): wasm.Program {
       case 'importMem': return [{ mod: 'env', nm: d.name, desc: { t: 'mem', memtype: d.mt } }];
     }
   }
-  const codes = (() => { throw 'nope' })();
+
+  function cvtBlockType(tp: BlockType | undefined): wasm.BlockType | undefined {
+    if (tp === undefined) {
+      return undefined;
+    }
+    if (typeof tp == 'object') {
+      return numberOfType[stringOfFunctionType(tp)];
+    }
+    else {
+      return tp;
+    }
+  }
+
+  function assembleInstr(blockLabels: (string | undefined)[], locals: Arg[], ins: Instr): wasm.Instr {
+    function lookupBlock(label: string): number {
+      const ix = blockLabels.findIndex(x => x !== undefined && x == label);
+      if (ix == -1) {
+        throw new Error(`Can't find block '${label}'`);
+      }
+      return ix;
+    }
+    function lookupLocal(label: string): number {
+      const ix = locals.findIndex(x => x.name == label);
+      if (ix == -1) {
+        throw new Error(`Can't find local '${label}'`);
+      }
+      return ix;
+    }
+
+    switch (ins.t) {
+      case 'block': return { t: 'block', tp: cvtBlockType(ins.tp), body: assembleFunc([ins.label, ...blockLabels], locals, ins.body) };
+      case 'loop': return { t: 'loop', tp: cvtBlockType(ins.tp), body: assembleFunc([ins.label, ...blockLabels], locals, ins.body) };
+      case 'br_if': return { t: 'br_if', n: lookupBlock(ins.n) };
+      case 'local.get': return { t: 'local.get', n: lookupLocal(ins.n) };
+      case 'local.set': return { t: 'local.set', n: lookupLocal(ins.n) };
+      case 'local.tee': return { t: 'local.tee', n: lookupLocal(ins.n) };
+      case 'call': return { t: 'call', f: lookupFunc(ins.f) };
+      default: return ins;
+    }
+  }
+
+  function assembleFunc(blockLabels: (string | undefined)[], locals: Arg[], body: Instr[]): wasm.Instr[] {
+    return body.map(ins => assembleInstr(blockLabels, locals, ins));
+  }
+
+  function getCodes(d: Decl): wasm.FuncDefn[] {
+    switch (d.t) {
+      case 'func': return [{ e: assembleFunc([], [...d.decl.args, ...d.locals], d.body), locals: d.locals.map(l => ({ count: 1, tp: l.tp })) }];
+      default: return [];
+    }
+  }
+  const codes = p.flatMap(d => getCodes(d));
   const functions = p.flatMap(d => getFunctions(d));
   const imports = p.flatMap(d => getImports(d));
   const types: wasm.FuncType[] = ptypes.map(t => ({ i: t.args, o: t.ret }));

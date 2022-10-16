@@ -24,7 +24,7 @@ const prog: Program = {
         { t: 'local.tee', n: 2 },
         { t: 'i32.const', n: 0 },
         { t: 'local.set', n: 3 },
-        { t: 'call', fidx: 0 /* log */ },
+        { t: 'call', f: 0 /* log */ },
         {
           t: 'loop', body: [
 
@@ -32,7 +32,7 @@ const prog: Program = {
             { t: 'local.get', n: 3 },
             { t: 'i32.load8_u', memarg: { align: 0, offset: 1 } },
             // print
-            { t: 'call', fidx: 0 },
+            { t: 'call', f: 0 },
             // increment
             { t: 'local.get', n: 3 },
             { t: 'i32.const', n: 1 },

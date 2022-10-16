@@ -38,7 +38,7 @@ export type Program = {
   codes: FuncDefn[]
 };
 
-type BlockType = number | ValType;
+export type BlockType = number | ValType;
 
 export type MemArg = {
   align: number,
@@ -62,14 +62,14 @@ export type Instr =
   | { t: 'return' }
   | { t: 'drop' }
   | { t: 'select' }
-  | { t: 'call', fidx: number }
+  | { t: 'call', f: number }
   | { t: 'i32.load8_u', memarg: MemArg };
 
 
 type Expr = Instr[];
 
 type Local = { count: number, tp: ValType };
-type FuncDefn = {
+export type FuncDefn = {
   locals: Local[];
   e: Expr;
 }
@@ -161,7 +161,7 @@ function emitInstr(x: Instr): number[] {
     case 'i32.ne': return [0x47];
     case 'i32.gt_s': return [0x4a];
     case 'i32.add': return [0x6a];
-    case 'call': return [0x10, ...uint(x.fidx)];
+    case 'call': return [0x10, ...uint(x.f)];
     case 'i32.load8_u': return [0x2d, ...uint(x.memarg.align), ...uint(x.memarg.offset)];
   }
 }
