@@ -41,4 +41,5 @@ async function go() {
 
   document.write(results.join('<br/>'));
 }
+
 go();
