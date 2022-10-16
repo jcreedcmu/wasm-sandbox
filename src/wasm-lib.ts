@@ -6,14 +6,19 @@ function sint(n: number): number[] {
   return (n < 64 && n >= -64) ? [n < 0 ? n + 128 : n] : [0x80 | (n & 0x7f), ...sint(n >> 7)];
 }
 
-type TypeIdx = number;
-type MemType = { min: number, max?: number };
+export type TypeIdx = number;
+export type MemType =
+  {
+    // these are both counted in number of 65KB pages
+    min: number,
+    max?: number
+  };
 type NumType = 'i32' | 'f32' | 'i64' | 'f64';
 type RefType = 'funcref' | 'externref';
-type ValType = NumType | RefType;
-type FuncType = { i: ValType[], o: ValType[] };
-type Import = { mod: string, nm: string, desc: ImportDesc };
-type Export = { nm: string, desc: ExportDesc };
+export type ValType = NumType | RefType;
+export type FuncType = { i: ValType[], o: ValType[] };
+export type Import = { mod: string, nm: string, desc: ImportDesc };
+export type Export = { nm: string, desc: ExportDesc };
 type ImportDesc =
   | { t: 'func', typeidx: number }
   | { t: 'table' }
@@ -35,12 +40,12 @@ export type Program = {
 
 type BlockType = number | ValType;
 
-type MemArg = {
+export type MemArg = {
   align: number,
   offset: number,
 };
 
-type Instr =
+export type Instr =
   | { t: 'unreachable' }
   | { t: 'nop' }
   | { t: 'block', tp?: BlockType, body: Instr[] }
