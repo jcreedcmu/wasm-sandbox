@@ -89,6 +89,7 @@ const sprog: surface.Program = [
   },
   { t: 'importFunc', name: 'log', tp: { args: ['i32'], ret: [] } },
   { t: 'importMem', name: '__linear_memory', mt: { min: 1 } },
+  { t: 'table', name: 'jumptable', limits: { min: 0 } },
 ];
 
 async function go() {
@@ -97,12 +98,14 @@ async function go() {
     const bytes = emit(prog);
     console.log(bytes);
     fs.writeFileSync(path.join(__dirname, "../public/a.wasm"), bytes);
-    const instance = await WebAssembly.instantiate(bytes, {
-      env: {
-        __linear_memory: new WebAssembly.Memory({ initial: 1 }),
-        log: (a: number, b: number) => { console.log('success', a, b); }
-      }
-    });
+    if (1) {
+      const instance = await WebAssembly.instantiate(bytes, {
+        env: {
+          __linear_memory: new WebAssembly.Memory({ initial: 1 }),
+          log: (a: number, b: number) => { console.log('success', a, b); }
+        }
+      });
+    }
     console.log('ok');
   }
   catch (e) {

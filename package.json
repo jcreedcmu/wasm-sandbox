@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "wabt": "^1.0.23"
+    "wabt": "^1.0.30"
   },
   "devDependencies": {
     "@types/node": "^15.0.3",

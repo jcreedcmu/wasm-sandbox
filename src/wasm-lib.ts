@@ -24,7 +24,7 @@ export type MemType = {
 };
 
 type NumType = 'i32' | 'f32' | 'i64' | 'f64';
-type RefType = 'funcref' | 'externref';
+export type RefType = 'funcref' | 'externref';
 export type ValType = NumType | RefType;
 export type FuncType = { i: ValType[], o: ValType[] };
 export type Import = { mod: string, nm: string, desc: ImportDesc };

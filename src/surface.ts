@@ -33,6 +33,7 @@ export type Decl =
   | { t: 'importFunc', name: string, tp: FuncType }
   | { t: 'importMem', name: string, mt: wasm.MemType }
   | { t: 'func', name: string, locals: Arg[], decl: FuncDecl, doExport?: boolean, body: Instr[] }
+  | { t: 'table', name: string, limits: wasm.Limits }
 
 export type Program = Decl[];
 
@@ -115,9 +116,9 @@ export function assemble(p: Program): wasm.Program {
 
   function getImports(d: Decl): wasm.Import[] {
     switch (d.t) {
-      case 'func': return [];
       case 'importFunc': return [{ mod: 'env', nm: d.name, desc: { t: 'func', typeidx: numberOfType[stringOfFunctionType(d.tp)] } }];
       case 'importMem': return [{ mod: 'env', nm: d.name, desc: { t: 'mem', memtype: d.mt } }];
+      default: return [];
     }
   }
 
@@ -174,6 +175,8 @@ export function assemble(p: Program): wasm.Program {
 
   function getTables(d: Decl): wasm.TableDefn[] {
     switch (d.t) {
+      // I think non-imported tables must be funcref
+      case 'table': return [{ tp: { ref: 'funcref', limits: d.limits } }];
       default: return [];
     }
   }
